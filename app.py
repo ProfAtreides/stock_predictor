@@ -41,7 +41,6 @@ def _extract_close(df: pd.DataFrame, symbol_hint: str | None = None) -> pd.Serie
     if df is None or df.empty:
         raise RuntimeError("Pusty DataFrame")
 
-    # czasem wpadnie Series
     if isinstance(df, pd.Series):
         return df.copy()
 
@@ -62,13 +61,10 @@ def _extract_close(df: pd.DataFrame, symbol_hint: str | None = None) -> pd.Serie
             close_block = df.xs("Close", axis=1, level=0)
             return close_block.iloc[:, 0].copy()
 
-    # fallback: pierwsza kolumna jako Series
     return df.iloc[:, 0].copy()
 
 
 def download_close_stooq(symbol: str, start: str, end: str) -> pd.Series:
-    # Stooq CSV API: https://stooq.com/q/d/l/?s=wig&i=d
-    # Parametry dat opcjonalne: d1=YYYYMMDD, d2=YYYYMMDD
     d1 = pd.to_datetime(start).strftime("%Y%m%d")
     d2 = pd.to_datetime(end).strftime("%Y%m%d")
 
@@ -116,7 +112,6 @@ def build_dataset(start: str, end: str, symbols: Symbols) -> pd.DataFrame:
     wig = download_close_any(symbols.wig_stooq, symbols.wig_yf, start, end)
     wig.name = "wig"
 
-    # Surowce: próbuj Stooq, ale w praktyce często wyląduje na Yahoo.
     copper = download_close_any(symbols.copper_stooq, symbols.copper_yf, start, end)
     copper.name = "copper"
 
@@ -133,16 +128,11 @@ def build_dataset(start: str, end: str, symbols: Symbols) -> pd.DataFrame:
     df = df.dropna(subset=["kghm"]).copy()
     return df
 
-
-# --- Stabilizacja: uczymy modele na log-zwrocie KGHM zamiast bezpośrednio na cenie ---
-
 def add_supervised_target(df: pd.DataFrame, horizon_days: int = 1) -> pd.DataFrame:
     out = df.copy()
 
-    # log-return: ln(P_{t+h} / P_t). To zwykle redukuje "optymizm" modeli NN.
     out["y"] = np.log(out["kghm"].shift(-horizon_days) / out["kghm"])  # t -> t+1
 
-    # do rekonstrukcji ceny w ewaluacji/wykresach
     out["kghm_t"] = out["kghm"]
 
     out = out.dropna(subset=["y", "kghm_t"]).copy()
@@ -405,7 +395,7 @@ def plot_predictions(results: dict, title: str, out_path: str | None = None, tra
 
     plt.title(title)
     plt.xlabel("Data")
-    plt.ylabel("Cena KGHM (Close) - predykcja t+1")
+    plt.ylabel("Cena KGHM - predykcja t+1")
     plt.legend()
     plt.tight_layout()
 
@@ -508,9 +498,6 @@ def _plot_on_axis(
         ax_left = ax_pred
         ax_right = ax_pred.twinx()
 
-        ax_left.plot(actual_price.index, actual_price.values, color="tab:gray", linewidth=1.5, alpha=0.7, label="KGHM (Close)")
-        ax_left.set_ylabel("KGHM (Close)")
-
         ax_pred = ax_right
         ax_pred.set_ylabel("Cena KGHM (t+1) – predykcja")
 
@@ -556,10 +543,10 @@ def render_and_save_dashboard(
     fig, axes = plt.subplots(2, 2, figsize=(16, 9), sharey=False)
 
     panels = [
-        (0.2, "pełny", "pred_5y_20_80_full.png"),
-        (0.2, "ostatni_rok", "pred_5y_20_80_last_year.png"),
-        (0.4, "pełny", "pred_5y_40_60_full.png"),
-        (0.4, "ostatni_rok", "pred_5y_40_60_last_year.png"),
+        (0.2, "pełny", "5y_20_80_full.png"),
+        (0.2, "ostatni_rok", "5y_20_80_last_year.png"),
+        (0.4, "pełny", "5y_40_60_full.png"),
+        (0.4, "ostatni_rok", "5y_40_60_last_year.png"),
     ]
 
     for ax, (split, mode, out_path) in zip(axes.ravel(), panels, strict=False):
@@ -574,10 +561,10 @@ def render_and_save_dashboard(
 
         if mode == "ostatni_rok":
             y_true_test, preds_test = _filter_last_year_from_end(y_true_test, preds_test, dataset_end_date)
-            title = f"5 lat | split {int(split*100)}/{int((1-split)*100)} | OST. ROK"
+            title = f"5 lat | split {int(split*100)}/{int((1-split)*100)} | ostatni rok"
             show_train = False
         else:
-            title = f"5 lat | split {int(split*100)}/{int((1-split)*100)} | pełny zakres"
+            title = f"5 lat | split {int(split*100)}/{int((1-split)*100)} | 5 lat"
             show_actual_left = True
             actual_series = raw_price
 
