@@ -1,0 +1,21 @@
+<<<<<<< HEAD
+.venv
+.idea
+__pycache__/
+.git
+=======
+.idea/
+.venv/
+.env/
+.vscode/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+plots/
+>>>>>>> 6b950cd ('init')
